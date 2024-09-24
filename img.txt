@@ -1,5 +1,0 @@
-/mnt/SDCARD/trump.png
-/mnt/SDCARD/elon.png
-/mnt/SDCARD/pudi.png
-/mnt/SDCARD/einstein.png
-
