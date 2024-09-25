@@ -269,7 +269,7 @@ void renderDescription(Uint8 alpha) {
 	}
 }
 
-void rollingDescription() {
+void scrollingDescription() {
 
 	// pause few frames in the begining
 	if (scrollingPause > 0) {
@@ -471,7 +471,7 @@ int main(int argc, char *argv[])
 		}
 		
 		(*currentIter)->renderOffset(0, 0);
-		if (isScrollingMessage) rollingDescription();
+		if (isScrollingMessage) scrollingDescription();
 		renderDescription(255);
 		SDL_RenderPresent(global::renderer);
 
