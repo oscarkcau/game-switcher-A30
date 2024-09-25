@@ -32,6 +32,12 @@ SDL_Rect overlay_bg_render_rect = {0};
 SDL_Rect overlay_text_render_rect = {0};
 bool isMultipleLineTitle = false;
 bool isShowDescription = true;
+bool isScrollingMessage = false;
+int scrollingOffset = 0; // current scrolling offset
+int scrollingLength = 0; // length of scrolling text with space
+int scrollingTargetY = 0; // starting value of texture target y coordinate
+int scrollingPause = 10; // number of frames to pause when text touch left screen boundary
+int scrollingSpeed = 4; // scrolling speed in pixel per frame
 
 char *ltrim(char *s)
 {
@@ -53,10 +59,11 @@ double easeInOutQuart(double x) {
 
 void printUsage() {
 	cout << endl
-		<< "Usage: switcher image_list title_list [-s speed] [-m on|off] [-t on|off]" << endl << endl
-		<< "-s:\tscrolling speed in frames (default is 20), larger value means slower." << endl
+		<< "Usage: switcher image_list title_list [-s speed] [-m on|off] [-t on|off] [-ts speed]" << endl << endl
+		<< "-s:\timage scrolling speed in frames (default is 20), larger value means slower." << endl
 		<< "-m:\tdisplay title in multiple lines (default is off)." << endl
 		<< "-t:\tdisplay title at start (default is on)." << endl
+		<< "-ts:\ttitle scrolling speed in pixel per frame (default is 4)." << endl
 		<< "-h,--help\tshow this help message." << endl
 		<< endl
 		<< "Control: Left/Right: Switch games, A: Confirm, B: Cancel, R1: Toggle title" << endl
@@ -110,6 +117,13 @@ void handleOptions(int argc, char *argv[]) {
 			if (strcmp(argv[i+1], "on") == 0) isShowDescription = true;
 			else if (strcmp(argv[i+1], "off") == 0) isShowDescription = false;
 			else printErrorUsageAndExit("-t: Invalue option value, expects on/off\n");
+			i += 2;
+		}
+		else if (strcmp(option, "-ts") == 0) {
+			if (i == argc - 1) printErrorUsageAndExit("-ts: Missing option value");
+			int s = atoi(argv[i+1]);
+			if (s <= 0) printErrorUsageAndExit("-ts: Invalue scrolling speed");
+			scrollingSpeed = s;
 			i += 2;
 		}
 		else if (strcmp(option, "-h") == 0 || strcmp(option, "--help") == 0) {
@@ -209,13 +223,27 @@ void updateMessageTexture(const char * message) {
     messageTexture = SDL_CreateTextureFromSurface(
 		global::renderer, 
 		surfaceMessage);
-    SDL_FreeSurface(surfaceMessage);
+
 	overlay_text_render_rect.x = 
 		(global::SCREEN_WIDTH - surfaceMessage->w) + 
 		(surfaceMessage->w - surfaceMessage->h) / 2;    
-	overlay_text_render_rect.y = (global::SCREEN_HEIGHT - surfaceMessage->h) / 2;
+	overlay_text_render_rect.y = 
+		(global::SCREEN_HEIGHT - surfaceMessage->h) / 2;
 	overlay_text_render_rect.w = surfaceMessage->w;
 	overlay_text_render_rect.h = surfaceMessage->h;
+
+	// initial variables for scrolling title
+	isScrollingMessage = false;
+	if (!isMultipleLineTitle && surfaceMessage->w > global::SCREEN_HEIGHT)
+	{
+		isScrollingMessage = true;
+		scrollingPause = 10;
+		scrollingOffset = 0;
+		scrollingLength = surfaceMessage->w + 40;
+		scrollingLength -= scrollingLength % 4;
+		overlay_text_render_rect.y += (global::SCREEN_HEIGHT - surfaceMessage->w) / 2;
+		scrollingTargetY = overlay_text_render_rect.y;
+	}
 
 	if (isMultipleLineTitle) {
 		overlay_bg_render_rect.x = global::SCREEN_WIDTH - surfaceMessage->h;
@@ -223,13 +251,42 @@ void updateMessageTexture(const char * message) {
 		overlay_bg_render_rect.w = surfaceMessage->h;
 		overlay_bg_render_rect.h = global::SCREEN_HEIGHT;
 	}
+
+    SDL_FreeSurface(surfaceMessage);
 }
 
 void renderDescription(Uint8 alpha) {
 	if (!isShowDescription) return;
-	SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
+	SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &overlay_bg_render_rect);
 	SDL_SetTextureAlphaMod(messageTexture, alpha);
-	SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+	SDL_RenderCopyEx(global::renderer, messageTexture, nullptr, &overlay_text_render_rect, 270, nullptr, SDL_FLIP_NONE);
+
+	// render the second message if using rolling message  
+	if (isScrollingMessage && scrollingLength - scrollingOffset < global::SCREEN_HEIGHT) {
+		auto rect = overlay_text_render_rect; // struct copy here
+		rect.y -= scrollingLength; // shift right with scrolling text length
+		SDL_RenderCopyEx(global::renderer, messageTexture, nullptr, &rect, 270, nullptr, SDL_FLIP_NONE);
+	}
+}
+
+void rollingDescription() {
+
+	// pause few frames in the begining
+	if (scrollingPause > 0) {
+		scrollingPause--;
+		return;
+	}
+
+	// update offset and texture target y coordinate
+	scrollingOffset += scrollingSpeed;
+	overlay_text_render_rect.y += scrollingSpeed;
+
+	// reset if the text is completely scrolled outside of screen
+	if (scrollingOffset >= scrollingLength) {
+		scrollingPause = 10;
+		scrollingOffset = 0;
+		overlay_text_render_rect.y = scrollingTargetY;
+	}
 }
 
 void scrollLeft() {
@@ -414,9 +471,10 @@ int main(int argc, char *argv[])
 		}
 		
 		(*currentIter)->renderOffset(0, 0);
+		if (isScrollingMessage) rollingDescription();
 		renderDescription(255);
 		SDL_RenderPresent(global::renderer);
-	
+
 		SDL_Delay(30);		
 	}
 
