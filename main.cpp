@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cmath>
 #include <list>
+#include <iostream>
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -21,6 +22,7 @@ int fontSize = 28;
 SDL_Color text_color = {255, 255, 255, 255};
 
 // global variables used in main.cpp
+string programName;
 list<ImageItem*> imageItems; // all loaded images
 std::list<ImageItem*>::iterator currentIter; // iterator point to current image item 
 TTF_Font* font = nullptr;
@@ -48,13 +50,67 @@ double easeInOutQuart(double x) {
     return x < 0.5 ? 8 * x * x * x * x : 1 - pow(-2 * x + 2, 4) / 2;
 }
 
-int loadImageFiles(void * filename) {	
-	// open file
-	FILE* file = fopen((char*)filename, "r");
-	if (file == nullptr) {
-		printf("cannot open file\n");
-		exit(0);
+void printUsage() {
+	cout << endl
+		<< "Usage: switcher image_list title_list [-s speed] [-m on|off]" << endl << endl
+		<< "-s:\tscrolling speed in frames (default is 20), larger value means slower." << endl
+		<< "-m:\tdisplay title in multiple lines (default is off)." << endl
+		<< "-h,--help\tshow this help message." << endl
+		<< endl;
+}
+
+void printErrorAndExit(const char* message, const char* extraMessage = nullptr) {
+	cerr << programName << ": " << message;
+	if (extraMessage != nullptr) cerr << extraMessage;
+	cerr << endl << endl;
+	exit(0);
+}
+
+void printErrorUsageAndExit(const char* message, const char* extraMessage = nullptr)
+{
+	cerr << programName << ": " << message;
+	if (extraMessage != nullptr) cerr << extraMessage;
+	cerr << endl;
+	printUsage();
+	exit(0);
+}
+
+void handleOptions(int argc, char *argv[]) {
+	programName = File_utils::getFileName(argv[0]);
+
+	// ensuer enough number of arguments
+	if (argc < 3) printErrorUsageAndExit("Arguments missing");
+    
+	// handle options
+	int i = 3;
+	while (i<argc) {
+		auto option = argv[i];
+		if (strcmp(option, "-s") == 0) {
+			if (i == argc - 1) printErrorUsageAndExit("-s: Missing option value");
+			int s = atoi(argv[i+1]);
+			if (s <= 0) printErrorUsageAndExit("-s: Invalue scrolling speed");
+			scrollingFrames = s;
+			i += 2;
+		}
+		else if (strcmp(option, "-m") == 0) {
+			if (i == argc - 1) printErrorUsageAndExit("-m: Missing option value");
+			if (strcmp(argv[i+1], "on") == 0) isMultipleLineTitle = true;
+			else if (strcmp(argv[i+1], "off") == 0) isMultipleLineTitle = false;
+			else printErrorUsageAndExit("-m: Invalue option value, expects on/off\n");
+			i += 2;
+		}
+		else if (strcmp(option, "-h") == 0 || strcmp(option, "--help") == 0) {
+			printUsage();
+			exit(0);
+		} 
+		else printErrorUsageAndExit("Invalue option: ", option);
 	}
+}
+
+int loadImageFiles(const char * filename) {	
+	// open file
+	FILE* file = fopen(filename, "r");
+	if (file == nullptr) printErrorAndExit("cannot open file: ", filename);
 	
 	// read lines of image filename and load images
 	char line[1024];
@@ -78,13 +134,11 @@ int loadImageFiles(void * filename) {
 	return 0;
 }
 
-int loadImageDescriptions(void * filename) {	
+int loadImageDescriptions(const char * filename) {	
 	// open file
-	FILE* file = fopen((char*)filename, "r");
-	if (file == nullptr) {
-		printf("cannot open file\n");
-		exit(0);
-	}
+	FILE* file = fopen(filename, "r");
+	if (file == nullptr) printErrorAndExit("cannot open file: ", filename);
+
 	
 	// read lines of description from filename
 	char line[1024];
@@ -251,52 +305,22 @@ int main(int argc, char *argv[])
 	SDL_Surface *surface = NULL;
     SDL_Surface *screen = NULL;
 
-	if (argc < 3) {
-		printf("Arguments missing\n");
-		printf("Usage: switcher image_list title_list [-s speed] [-m on|off]");
-		printf("-s: scrolling speed in frames (default is 20), larger value means slower.");
-		printf("-m: display title in multiple lines (default is off).");
-        exit(0);
-	}
-    
-	// handle options
-	for (int i=3; i<argc-1; i+=2) {
-		auto option = argv[i];
-		auto value = argv[i+1];
-		if (strcmp(option, "-s") == 0) {
-			int s = atoi(value);
-			if (s <= 0) { printf("-s: Invalue scrolling speed\n"); exit(0); }
-			scrollingFrames = s;
-		}
-		else if (strcmp(option, "-m") == 0) {
-			if (strcmp(value, "on") == 0) isMultipleLineTitle = true;
-			else if (strcmp(value, "off") == 0) isMultipleLineTitle = false;
-			else { printf("-m: Invalue option, expects on/off\n"); exit(0); }
-		}
-		else {
-			printf("Invalue options %s\n", option);
-			exit(0);
-		}
-	}
+	handleOptions(argc, argv);
 
     // Init SDL
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK);
     if (IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG | IMG_INIT_TIF | IMG_INIT_WEBP) == 0) {
-		printf("IMG_Init failed\n");
+		printErrorAndExit("IMG_Init failed");
     } else {
         // Clear the errors for image libraries that did not initialize.
         SDL_ClearError();
     }
 
     // Init font
-    if (TTF_Init() == -1) {
-		printf("TTF_Init failed: ");
-		printf(SDL_GetError());
-		printf("\n");
-        exit(0);
-    }
+    if (TTF_Init() == -1) printErrorAndExit("TTF_Init failed: ", SDL_GetError());
+
     font = TTF_OpenFont("./nunwen.ttf", fontSize);
-    if(font == nullptr){ printf("Font loading failed: %s\n", TTF_GetError()); exit(0); }
+    if (font == nullptr) printErrorAndExit("Font loading failed: ", TTF_GetError());
 
     // Hide cursor before creating the output surface.
     SDL_ShowCursor(SDL_DISABLE);
@@ -311,7 +335,7 @@ int main(int argc, char *argv[])
     global::renderer = SDL_CreateRenderer(window, 
 		-1, 
 		SDL_RENDERER_PRESENTVSYNC);
-	if (global::renderer == nullptr) { printf("FUCK RENDERER\n"); exit(0); }
+	if (global::renderer == nullptr) printErrorAndExit("Renderer creation failed");
 
 	// create message overlay background texture
 	int overlay_height = fontSize + fontSize / 2;	
@@ -342,7 +366,7 @@ int main(int argc, char *argv[])
 
 	// load all image filenames and create imageItem instances
 	loadImageFiles(argv[1]);
-	if (imageItems.size() == 0) { printf("FUCK NO IMAGE\n"); exit(0); }
+	if (imageItems.size() == 0) printErrorAndExit("Cannot load image list");
 
 	loadImageDescriptions(argv[2]);
 
@@ -352,8 +376,6 @@ int main(int argc, char *argv[])
 
 	// load all other image fiies in background thread
 	SDL_Thread* threadID = SDL_CreateThread(loadAllImages, "load_images", nullptr);
-
-	printf("finished loading file\n");
 
 	// set current image as last image in list
 	currentIter = --imageItems.end();

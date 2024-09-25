@@ -1,11 +1,14 @@
 #include "image_item.h"
 
+#include <iostream>
 #include <SDL.h>
 #include <SDL_image.h>
 
 #include "global.h"
 #include "SDL_rotozoom.h"
 #include "fileutils.h"
+
+using namespace std;
 
 ImageItem::ImageItem(int index, std::string filename)
     : index_(index), filename_(std::move(filename))
@@ -32,7 +35,7 @@ void ImageItem::loadImage()
 		)
 	};
     
-	if (image_ == nullptr) printf("FUCK IMG\n");
+	if (image_ == nullptr) cerr << ("Image loading failed: ") << filename_ << endl;
     loading_ok_ = (image_ != nullptr);
 }
 
@@ -42,7 +45,7 @@ void ImageItem::createTexture()
 		SDL_CreateTextureFromSurface(global::renderer, image_.get())
 	};
 
-	if (texture_ == nullptr) printf("FUCK TEX\n");
+	if (texture_ == nullptr) cerr << ("Texture creation failed") << endl;
 }
 
 
@@ -91,9 +94,7 @@ SDLSurfaceUniquePtr ImageItem::loadImageToFit(
     if (IMG_GetError() != nullptr && *IMG_GetError() != '\0') {
         if (!strcmp(IMG_GetError(), "Unsupported image format") == 0)
         {
-			printf("loadImageToFit: ");
-			printf(IMG_GetError());
-			printf("\n");
+            cerr << "loadImageToFit: " << IMG_GetError() << endl;
 		}
         SDL_ClearError();
         return nullptr;
