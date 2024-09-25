@@ -31,6 +31,7 @@ SDL_Texture* messageTexture = nullptr;
 SDL_Rect overlay_bg_render_rect = {0};
 SDL_Rect overlay_text_render_rect = {0};
 bool isMultipleLineTitle = false;
+bool isShowDescription = true;
 
 char *ltrim(char *s)
 {
@@ -52,10 +53,15 @@ double easeInOutQuart(double x) {
 
 void printUsage() {
 	cout << endl
-		<< "Usage: switcher image_list title_list [-s speed] [-m on|off]" << endl << endl
+		<< "Usage: switcher image_list title_list [-s speed] [-m on|off] [-t on|off]" << endl << endl
 		<< "-s:\tscrolling speed in frames (default is 20), larger value means slower." << endl
 		<< "-m:\tdisplay title in multiple lines (default is off)." << endl
+		<< "-t:\tdisplay title at start (default is on)." << endl
 		<< "-h,--help\tshow this help message." << endl
+		<< endl
+		<< "Control: Left/Right: Switch games, A: Confirm, B: Cancel, R1: Toggle title" << endl
+		<< endl
+		<< "return value: the 1-based index of the selected image" << endl
 		<< endl;
 }
 
@@ -97,6 +103,13 @@ void handleOptions(int argc, char *argv[]) {
 			if (strcmp(argv[i+1], "on") == 0) isMultipleLineTitle = true;
 			else if (strcmp(argv[i+1], "off") == 0) isMultipleLineTitle = false;
 			else printErrorUsageAndExit("-m: Invalue option value, expects on/off\n");
+			i += 2;
+		}
+		else if (strcmp(option, "-t") == 0) {
+			if (i == argc - 1) printErrorUsageAndExit("-t: Missing option value");
+			if (strcmp(argv[i+1], "on") == 0) isShowDescription = true;
+			else if (strcmp(argv[i+1], "off") == 0) isShowDescription = false;
+			else printErrorUsageAndExit("-t: Invalue option value, expects on/off\n");
 			i += 2;
 		}
 		else if (strcmp(option, "-h") == 0 || strcmp(option, "--help") == 0) {
@@ -212,6 +225,13 @@ void updateMessageTexture(const char * message) {
 	}
 }
 
+void renderDescription(Uint8 alpha) {
+	if (!isShowDescription) return;
+	SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
+	SDL_SetTextureAlphaMod(messageTexture, alpha);
+	SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+}
+
 void scrollLeft() {
 	// get current and previous images
 	auto prevIter = currentIter;
@@ -230,24 +250,14 @@ void scrollLeft() {
 		SDL_RenderClear(global::renderer);
 		curr->renderOffset(0, easing);
 		prev->renderOffset(0, easing - 1);
-		SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
 	    int text_alpha = static_cast<int>((i * 255.0) / scrollingFrames);
-		SDL_SetTextureAlphaMod(messageTexture, text_alpha);
-		SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+		renderDescription(text_alpha);
 		offset += step;
 		SDL_RenderPresent(global::renderer);
 		SDL_Delay(30);
-
-		if (i == scrollingFrames / 2) {
-			// clear all key events during scrolling
-			SDL_PumpEvents();
-			SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
-		}
 	}
 	prev->renderOffset(0, 0);
-	SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
-	SDL_SetTextureAlphaMod(messageTexture, 255);
-	SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+	renderDescription(255);
 	SDL_RenderPresent(global::renderer);
 	
 	// update iterator
@@ -273,18 +283,14 @@ void scrollRight() {
 		SDL_RenderClear(global::renderer);
 		curr->renderOffset(0, easing - 1);
 		next->renderOffset(0, easing);
-	    SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
 	    int text_alpha = static_cast<int>((i * 255.0) / scrollingFrames);
-		SDL_SetTextureAlphaMod(messageTexture, text_alpha);
-		SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+		renderDescription(text_alpha);
 		offset -= step;
 		SDL_RenderPresent(global::renderer);
 		SDL_Delay(30);
 	}
 	next->renderOffset(0, 0);
-	SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
-	SDL_SetTextureAlphaMod(messageTexture, 255);
-	SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+	renderDescription(255);
 	SDL_RenderPresent(global::renderer);
 	
 	// update iterator
@@ -301,6 +307,7 @@ void keyPress(const SDL_Event &event) {
         case SDLK_LEFT: scrollLeft(); break;
 		// button RIGHT (Right arrow key)
         case SDLK_RIGHT: scrollRight(); break;
+		case SDLK_BACKSPACE: isShowDescription = !isShowDescription; break;
     }
     
     // button B (Left control key)
@@ -407,9 +414,7 @@ int main(int argc, char *argv[])
 		}
 		
 		(*currentIter)->renderOffset(0, 0);
-		SDL_RenderCopy(global::renderer, messageBGTexture, NULL, &overlay_bg_render_rect);
-		SDL_SetTextureAlphaMod(messageTexture, 255);
-		SDL_RenderCopyEx(global::renderer, messageTexture, NULL, &overlay_text_render_rect, 270, NULL, SDL_FLIP_NONE);
+		renderDescription(255);
 		SDL_RenderPresent(global::renderer);
 	
 		SDL_Delay(30);		
