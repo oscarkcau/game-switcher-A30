@@ -168,9 +168,20 @@ int loadImageDescriptions(const char * filename) {
 }
 
 int loadAllImages(void* data) {
-	for (auto it = imageItems.begin(); it != imageItems.end(); ++it){
-		(*it)->loadImage();
+	auto front = imageItems.begin();
+	auto back = --imageItems.end();
+	
+	// load images from both directions, 
+	// make sure the images close to the first shown image will be loaded earlier.
+	while (true) {
+		(*front)->loadImage();
+		(*back)->loadImage();
+		
+		front++;
+		if (back != imageItems.begin()) back--;
+		if (front == imageItems.end()) break;
 	}
+
 	return 0;
 }
 
