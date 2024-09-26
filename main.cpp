@@ -5,6 +5,8 @@
 #include <cmath>
 #include <list>
 #include <iostream>
+#include <fstream>
+#include <algorithm>
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -41,21 +43,18 @@ int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
 
 namespace
 {
-
-	char *ltrim(char *s)
-	{
-		while (isspace(*s))
-			s++;
-		return s;
+	// trim from start (in place)
+	inline void ltrim(std::string &s) {
+		s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+			return !std::isspace(ch);
+		}));
 	}
 
-	char *rtrim(char *s)
-	{
-		char *back = s + strlen(s);
-		while (isspace(*--back))
-			;
-		*(back + 1) = '\0';
-		return s;
+	// trim from end (in place)
+	inline void rtrim(std::string &s) {
+		s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+			return !std::isspace(ch);
+		}).base(), s.end());
 	}
 
 	double easeInOutQuart(double x)
@@ -167,70 +166,79 @@ namespace
 		}
 	}
 
-	int loadImageFiles(const char *filename)
+	void loadImageFiles(const char *filename)
 	{
 		// open file
-		FILE *file = fopen(filename, "r");
-		if (file == nullptr)
-			printErrorAndExit("cannot open file: ", filename);
-
-		// read lines of image filename and load images
-		char line[1024];
-		int index = 1;
-		while (fgets(line, sizeof(line), file))
+		std::ifstream file;
+		file.open(filename);
+		
+		if (file.is_open())
 		{
+			string line;
+			int index = 1;
 
-			// trim input line
-			char *trimmed = rtrim(ltrim(line));
+			// iterate all input line
+			while (std::getline(file, line))
+			{
+				// trim input line
+				rtrim(line);
+				ltrim(line);
 
-			// skip empty line
-			if (strlen(trimmed) == 0)
-				continue;
+				// skip empty line
+				if (line.empty()) continue;
 
-			// create imageItem and add to list
-			imageItems.push_back(new ImageItem(index, trimmed));
-			index++;
+				// create imageItem and add to list
+				imageItems.push_back(new ImageItem(index, line));
+				index++;
+			}
+		}
+		else
+		{
+			printErrorAndExit("cannot open file: ", filename);
 		}
 
 		// close file
-		fclose(file);
-
-		return 0;
+		file.close();
 	}
 
 	int loadImageDescriptions(const char *filename)
 	{
 		// open file
-		FILE *file = fopen(filename, "r");
-		if (file == nullptr)
-			printErrorAndExit("cannot open file: ", filename);
+		std::ifstream file;
+		file.open(filename);
 
-		// read lines of description from filename
-		char line[1024];
-		auto iter = imageItems.begin();
-		while (fgets(line, sizeof(line), file))
+		if (file.is_open())
 		{
+			string line;
+			auto iter = imageItems.begin();
 
-			// trim input line
-			char *trimmed = rtrim(ltrim(line));
+			// iterate all input line
+			while (std::getline(file, line))
+			{
+				// trim input line
+				rtrim(line);
+				ltrim(line);
 
-			// skip empty line
-			if (strlen(trimmed) == 0)
-				continue;
+				// skip empty line
+				if (line.empty()) continue;
 
-			// set description
-			(*iter)->setDescription(trimmed);
+				// set description
+				(*iter)->setDescription(line);
 
-			// move to next imageItem
-			iter++;
+				// move to next imageItem
+				iter++;
 
-			// exit loop after reading enough lines
-			if (iter == imageItems.end())
-				break;
+				// exit loop after reading enough lines
+				if (iter == imageItems.end()) break;
+			}
+		}
+		else
+		{
+			printErrorAndExit("cannot open file: ", filename);
 		}
 
 		// close file
-		fclose(file);
+		file.close();
 
 		return 0;
 	}
@@ -257,15 +265,27 @@ namespace
 		return 0;
 	}
 
-	void updateMessageTexture(const char *message)
+	void updateMessageTexture(string message)
 	{
 		// create new message text texture
-		Uint32 wrapLength = isMultipleLineTitle ? global::SCREEN_HEIGHT - 20 : 2048;
-		SDL_Surface *surfaceMessage = TTF_RenderText_Blended_Wrapped(
-			font,
-			message,
-			text_color,
-			wrapLength);
+		SDL_Surface *surfaceMessage = nullptr;
+		if (isMultipleLineTitle) 
+		{
+			surfaceMessage = TTF_RenderUTF8_Blended_Wrapped(
+				font,
+				message.c_str(),
+				text_color,
+				global::SCREEN_HEIGHT - 20
+			);
+		}
+		else
+		{
+			surfaceMessage = TTF_RenderUTF8_Blended(
+				font,
+				message.c_str(),
+				text_color
+			);
+		}
 		messageTexture = SDL_CreateTextureFromSurface(
 			global::renderer,
 			surfaceMessage);
@@ -321,7 +341,6 @@ namespace
 
 	void scrollingDescription()
 	{
-
 		// pause few frames in the begining
 		if (scrollingPause > 0)
 		{
@@ -351,7 +370,7 @@ namespace
 		ImageItem *prev = *prevIter;
 
 		// update new text first
-		updateMessageTexture(prev->getDescription().c_str());
+		updateMessageTexture(prev->getDescription());
 
 		// scroll images
 		double offset = 0;
@@ -387,7 +406,7 @@ namespace
 		ImageItem *next = *nextIter;
 
 		// update new text first
-		updateMessageTexture(next->getDescription().c_str());
+		updateMessageTexture(next->getDescription());
 
 		// scroll images
 		double offset = 1.0;
@@ -447,9 +466,7 @@ namespace
 
 int main(int argc, char *argv[])
 {
-	std::string image_path;
-	SDL_Window *window = NULL;
-
+	// handle CLI options
 	handleOptions(argc, argv);
 
 	// Init SDL
@@ -476,22 +493,14 @@ int main(int argc, char *argv[])
 	SDL_ShowCursor(SDL_DISABLE);
 
 	// Create window and renderer
-	window = SDL_CreateWindow("Main",
-							  0,
-							  0,
-							  global::SCREEN_WIDTH,
-							  global::SCREEN_HEIGHT,
-							  SDL_WINDOW_SHOWN);
-	global::renderer = SDL_CreateRenderer(window,
-										  -1,
-										  SDL_RENDERER_PRESENTVSYNC);
+	SDL_Window *window = SDL_CreateWindow("Main", 0, 0, global::SCREEN_WIDTH, global::SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	global::renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 	if (global::renderer == nullptr)
 		printErrorAndExit("Renderer creation failed");
 
 	// create message overlay background texture
 	int overlay_height = fontSize + fontSize / 2;
 	SDL_Rect overlay_bg_rect = {0, 0, overlay_height, global::SCREEN_HEIGHT};
-
 	overlay_bg_render_rect.x = global::SCREEN_WIDTH - overlay_height;
 	overlay_bg_render_rect.y = 0;
 	overlay_bg_render_rect.w = overlay_height;
@@ -517,6 +526,7 @@ int main(int argc, char *argv[])
 	if (imageItems.size() == 0)
 		printErrorAndExit("Cannot load image list");
 
+	// load all image titles
 	loadImageDescriptions(argv[2]);
 
 	// load first texture
@@ -530,12 +540,11 @@ int main(int argc, char *argv[])
 	currentIter = --imageItems.end();
 
 	// create message text texture
-	updateMessageTexture((*currentIter)->getDescription().c_str());
+	updateMessageTexture((*currentIter)->getDescription());
 
 	// Execute main loop of the window
 	while (true)
 	{
-
 		// handle input events
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
@@ -551,15 +560,17 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		// render current image and title
 		(*currentIter)->renderOffset(0, 0);
-		if (isScrollingMessage)
-			scrollingDescription();
+		if (isScrollingMessage) scrollingDescription();
 		renderDescription(255);
 		SDL_RenderPresent(global::renderer);
 
+		// delay for around 30 fps
 		SDL_Delay(30);
 	}
 
+	// the lines below should never reach, just for code completeness
 	SDL_DestroyTexture(messageBGTexture);
 	SDL_DestroyRenderer(global::renderer);
 	TTF_CloseFont(font);
