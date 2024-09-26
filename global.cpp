@@ -4,7 +4,7 @@
 
 namespace global
 {
-	
-	SDL_Renderer *renderer;	
-	
+
+	SDL_Renderer *renderer;
+
 } // namespace constants

@@ -5,7 +5,8 @@
 
 #include "sdl_unique_ptr.h"
 
-class ImageItem {
+class ImageItem
+{
 public:
     explicit ImageItem(int index, std::string filename);
     virtual ~ImageItem() = default;
@@ -27,21 +28,21 @@ public:
     // render itself at with offset in proportion to screen size,
     // image is centered in screen when offset is zero
     void renderOffset(double offset_x, double offset_y);
-        
+
     bool loading_ok_;
     int getIndex() const;
     std::string getFilename() const;
     void setDescription(std::string);
     std::string getDescription() const;
-private:
 
+private:
     void init();
 
     // Load an image to fit the given viewport size.
     SDLSurfaceUniquePtr loadImageToFit(
         const std::string &p_filename, int fit_w, int fit_h);
-    
-    int index_;    
+
+    int index_;
     std::string filename_;
     std::string description_;
     SDLSurfaceUniquePtr image_ = nullptr;
