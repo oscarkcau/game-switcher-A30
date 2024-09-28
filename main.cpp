@@ -22,6 +22,10 @@ using namespace std;
 int scrollingFrames = 20; // how many frames used for image scrolling
 int fontSize = 28;
 SDL_Color text_color = {255, 255, 255, 255};
+bool isMultipleLineTitle = false;
+bool isShowDescription = true;
+bool isSwapLeftRight = false;
+int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
 
 // global variables used in main.cpp
 string programName;
@@ -32,14 +36,11 @@ SDL_Texture *messageBGTexture = nullptr;
 SDL_Texture *messageTexture = nullptr;
 SDL_Rect overlay_bg_render_rect = {0, 0, 0, 0};
 SDL_Rect overlay_text_render_rect = {0, 0, 0, 0};
-bool isMultipleLineTitle = false;
-bool isShowDescription = true;
 bool isScrollingMessage = false;
 int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
 int scrollingTargetY = 0; // starting value of texture target y coordinate
 int scrollingPause = 10;  // number of frames to pause when text touch left screen boundary
-int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
 
 namespace
 {
@@ -65,9 +66,10 @@ namespace
 	void printUsage()
 	{
 		cout << endl
-			 << "Usage: switcher image_list title_list [-s speed] [-m on|off] [-t on|off] [-ts speed]" << endl
+			 << "Usage: switcher image_list title_list [-s speed] [-b on|off] [-m on|off] [-t on|off] [-ts speed]" << endl
 			 << endl
 			 << "-s:\timage scrolling speed in frames (default is 20), larger value means slower." << endl
+			 << "-b:\tswap left/right buttons for image scrolling (default is off)." << endl
 			 << "-m:\tdisplay title in multiple lines (default is off)." << endl
 			 << "-t:\tdisplay title at start (default is on)." << endl
 			 << "-ts:\ttitle scrolling speed in pixel per frame (default is 4)." << endl
@@ -120,6 +122,18 @@ namespace
 				if (s <= 0)
 					printErrorUsageAndExit("-s: Invalue scrolling speed");
 				scrollingFrames = s;
+				i += 2;
+			}
+			else if (strcmp(option, "-b") == 0)
+			{
+				if (i == argc - 1)
+					printErrorUsageAndExit("-b: Missing option value");
+				if (strcmp(argv[i + 1], "on") == 0)
+					isSwapLeftRight = true;
+				else if (strcmp(argv[i + 1], "off") == 0)
+					isSwapLeftRight = false;
+				else
+					printErrorUsageAndExit("-m: Invalue option value, expects on/off\n");
 				i += 2;
 			}
 			else if (strcmp(option, "-m") == 0)
@@ -361,7 +375,7 @@ namespace
 		}
 	}
 
-	void scrollLeft()
+	void scrollRight()
 	{
 		// get current and previous images
 		auto prevIter = currentIter;
@@ -395,7 +409,7 @@ namespace
 		currentIter = prevIter;
 	}
 
-	void scrollRight()
+	void scrollLeft()
 	{
 		// get current and next images
 		auto nextIter = currentIter;
@@ -444,11 +458,11 @@ namespace
 			break;
 		// button LEFT (Left arrow key)
 		case SDLK_LEFT:
-			scrollLeft();
+			if (isSwapLeftRight) scrollRight(); else scrollLeft();
 			break;
 		// button RIGHT (Right arrow key)
 		case SDLK_RIGHT:
-			scrollRight();
+			if (isSwapLeftRight) scrollLeft(); else scrollRight();
 			break;
 		case SDLK_BACKSPACE:
 			isShowDescription = !isShowDescription;

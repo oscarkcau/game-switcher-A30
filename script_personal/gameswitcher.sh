@@ -41,13 +41,14 @@ done <$LIST_FILE
 # launch the switcher program
 # Usage: switcher image_list title_list [-s speed] [-m on|off] [-t on|off] [-ts speed]
 # -s: scrolling speed in frames (default is 20), larger value means slower.
+# -b: swap left/right buttons for image scrolling (default is off).
 # -m: display title in multiple lines (default is off).
 # -t: display title at start (default is on).
 # -ts: title scrolling speed in pixel per frame (default is 4).
 # -h,--help show this help message.
 # return value: the 1-based index of the selected image
 cd /mnt/SDCARD/.tmp_update/bin/
-/mnt/SDCARD/.tmp_update/bin/switcher "$IMAGES_FILE" "$GAMENAMES_FILE" -s 10
+/mnt/SDCARD/.tmp_update/bin/switcher "$IMAGES_FILE" "$GAMENAMES_FILE" -s 10 
 
 # get return value and launch game with return index
 RETURN_INDEX=$?
