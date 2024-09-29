@@ -37,7 +37,8 @@ std::list<ImageItem *>::iterator currentIter; // iterator point to current image
 int fontSize = 28;
 SDL_Color text_color = {220, 220, 220, 255};
 SDL_Color delete_mode_text_color = {255, 50, 50, 255};
-TTF_Font *font = nullptr;
+TTF_Font *fontInstruction = nullptr;
+TTF_Font *fontTitle = nullptr;
 SDL_Texture *messageBGTexture = nullptr;
 TextTexture *titleTexture = nullptr;
 TextTexture *instructionTexture = nullptr;
@@ -50,7 +51,7 @@ int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
 int scrollingPause = 10;  // number of frames to pause when text touch left screen boundary
 string instructionText = "\u2190/\u2192:Scroll [A]:Confirm [B]:Cancel";
-string shortInstructionText = "[A]:Confirm [B]:Cancel";
+string shortInstructionText = "[A]:Load [B]:Exit";
 string deleteAddonText = " [Y]:Remove";
 string deleteInstructionText = "Remove Item?  [A]:Confirm [B]:Cancel";
 string argumentPlaceholder = "INDEX";
@@ -324,7 +325,7 @@ namespace
 		// create message overlay background texture
 		int overlay_height = fontSize + fontSize / 2;
 		SDL_Rect overlay_bg_rect = {0, 0, overlay_height, global::SCREEN_HEIGHT};
-		overlay_bg_render_rect.x = global::SCREEN_WIDTH - overlay_height;
+		overlay_bg_render_rect.x = 0;//global::SCREEN_WIDTH - overlay_height;
 		overlay_bg_render_rect.y = 0;
 		overlay_bg_render_rect.w = overlay_height;
 		overlay_bg_render_rect.h = global::SCREEN_HEIGHT;
@@ -349,17 +350,17 @@ namespace
 		if (isAllowDeletion) text += deleteAddonText; 
 		instructionTexture = new TextTexture(
 			text,
-			font,
+			fontInstruction,
 			text_color,
-			isShowItemIndex ? TextTextureAlignment::topLeft : TextTextureAlignment::topCenter
+			isShowItemIndex ? TextTextureAlignment::bottomLeft : TextTextureAlignment::bottomCenter
 		);
 
 		// create texture for delete instruction text
 		deleteInstructionTexture = new TextTexture(
 			deleteInstructionText,
-			font,
+			fontInstruction,
 			delete_mode_text_color,
-			TextTextureAlignment::topCenter
+			TextTextureAlignment::bottomCenter
 		);
 	}
 
@@ -370,9 +371,9 @@ namespace
 		{
 			titleTexture = new TextTexture(
 				message.c_str(),
-				font,
+				fontTitle,
 				text_color,
-				TextTextureAlignment::bottomLeft,
+				TextTextureAlignment::topLeft,
 				global::SCREEN_HEIGHT - 20
 			);
 		}
@@ -380,9 +381,9 @@ namespace
 		{
 			titleTexture = new TextTexture(
 				message.c_str(),
-				font,
+				fontTitle,
 				text_color,
-				TextTextureAlignment::bottomCenter
+				TextTextureAlignment::topCenter
 			);
 		}
 
@@ -395,13 +396,13 @@ namespace
 			scrollingOffset = 0;
 			scrollingLength = titleTexture->getWidth() + 40;
 			scrollingLength -= scrollingLength % scrollingSpeed;
-			titleTexture->updateTargetRect(TextTextureAlignment::bottomLeft);
+			titleTexture->updateTargetRect(TextTextureAlignment::topLeft);
 		}
 
 		// initial variables for multiline title
 		if (isMultilineTitle)
 		{
-			overlay_bg_render_rect.x = global::SCREEN_WIDTH - titleTexture->getHeight();
+			overlay_bg_render_rect.x = 0; //global::SCREEN_WIDTH - titleTexture->getHeight();
 			overlay_bg_render_rect.y = 0;
 			overlay_bg_render_rect.w = titleTexture->getHeight();
 			overlay_bg_render_rect.h = global::SCREEN_HEIGHT;
@@ -425,9 +426,9 @@ namespace
 		ss << '[' << index << '/' << imageItems.size() << ']'; 
 		indexTexture = new TextTexture(
 			ss.str(),
-			font,
+			fontInstruction,
 			text_color,
-			TextTextureAlignment::topRight
+			TextTextureAlignment::bottomRight
 		);
 
 		// shift left 5 pixels
@@ -437,10 +438,10 @@ namespace
 	void renderInstruction()
 	{
 		if (!isShowDescription) return;
-
+		int overlay_height = fontSize + fontSize / 2;
 		auto rect = overlay_bg_render_rect;
-		rect.x = 0;
-		rect.w = fontSize + fontSize / 2;
+		rect.x = global::SCREEN_WIDTH - overlay_height;
+		rect.w = overlay_height;
 
 		if (isDeleteMode) 
 		{
@@ -497,7 +498,7 @@ namespace
 		{
 			scrollingPause = 10;
 			scrollingOffset = 0;
-			titleTexture->updateTargetRect(TextTextureAlignment::bottomLeft);
+			titleTexture->updateTargetRect(TextTextureAlignment::topLeft);
 		}
 	}
 
@@ -674,6 +675,7 @@ namespace
 			break;
 		// button R1 (Backspace key)
 		case SDLK_BACKSPACE:
+			if (isDeleteMode) return; // disable in delete mode
 			isShowDescription = !isShowDescription;
 			break;
 		}
@@ -714,8 +716,9 @@ int main(int argc, char *argv[])
 	if (TTF_Init() == -1)
 		printErrorAndExit("TTF_Init failed: ", SDL_GetError());
 
-	font = TTF_OpenFont("./nunwen.ttf", fontSize);
-	if (font == nullptr)
+	fontInstruction = TTF_OpenFont("./nunwen.ttf", fontSize);
+	fontTitle = TTF_OpenFont("./nunwen.ttf", fontSize + 4);
+	if (fontInstruction == nullptr || fontTitle == nullptr)
 		printErrorAndExit("Font loading failed: ", TTF_GetError());
 
 	// Hide cursor before creating the output surface.
@@ -783,7 +786,8 @@ int main(int argc, char *argv[])
 	// the lines below should never reach, just for code completeness
 	SDL_DestroyTexture(messageBGTexture);
 	SDL_DestroyRenderer(global::renderer);
-	TTF_CloseFont(font);
+	TTF_CloseFont(fontInstruction);
+	TTF_CloseFont(fontTitle);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 	return 0;
