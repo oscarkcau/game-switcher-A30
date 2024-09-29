@@ -49,10 +49,11 @@ bool isDeleteMode = false;
 int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
 int scrollingPause = 10;  // number of frames to pause when text touch left screen boundary
-string instructionText = "\u2190/\u2192:Scroll [A]:Confirm [B]:Cancel [Y]:Remove";
-string shortInstructionText = "[A]:Confirm [B]:Cancel [Y]:Remove";
+string instructionText = "\u2190/\u2192:Scroll [A]:Confirm [B]:Cancel";
+string shortInstructionText = "[A]:Confirm [B]:Cancel";
+string deleteAddonText = " [Y]:Remove";
 string deleteInstructionText = "Remove Item?  [A]:Confirm [B]:Cancel";
-string argumentPlaceholder = "TITLE";
+string argumentPlaceholder = "INDEX";
 
 namespace
 {
@@ -344,8 +345,10 @@ namespace
 		SDL_FreeSurface(surfacebg);
 
 		// create texture for instruction text
+		string text = isShowItemIndex ? shortInstructionText : instructionText;
+		if (isAllowDeletion) text += deleteAddonText; 
 		instructionTexture = new TextTexture(
-			isShowItemIndex ? shortInstructionText : instructionText,
+			text,
 			font,
 			text_color,
 			isShowItemIndex ? TextTextureAlignment::topLeft : TextTextureAlignment::topCenter
@@ -605,6 +608,32 @@ namespace
 		if (isShowItemIndex) updateIndexTexture();
 	}
 
+	void runDeleteCommand(int currentIndex)
+	{
+		if (deleteCommand.empty()) return;
+
+		// convert current index to string
+		auto currentIndexText = std::to_string(currentIndex);
+
+		// get the provided command
+		string cmd = deleteCommand;
+
+		// replace placeholder with current index
+		unsigned int index = 0;
+		while (true)
+		{
+			// locate the substring to replace
+			index = cmd.find(argumentPlaceholder, index);
+			if (index == std::string::npos) break;
+			// make the replacement
+			cmd.replace(index, argumentPlaceholder.length(), currentIndexText);
+			// advance index forward
+			index += currentIndexText.length();
+		}
+		// run the cmd
+		system(cmd.c_str());
+	}
+
 	void keyPress(const SDL_Event &event)
 	{
 		if (event.type != SDL_KEYDOWN)
@@ -617,29 +646,9 @@ namespace
 			if (isDeleteMode) {
 				// delete mode: remove current item when A is pressed
 				isDeleteMode = false; // reset flag to end delete mode
-				string title = (*currentIter)->getDescription(); // get title of current item first
+				int currentIndex = (*currentIter)->getIndex(); // get title of current item first
 				removeCurrentItem();
-	
-				// if command is provided
-				if (!deleteCommand.empty())
-				{
-					// get the provided command
-					string cmd = deleteCommand;
-					// replace placeholder with current title
-					unsigned int index = 0;
-					while (true)
-					{
-						// Locate the substring to replace
-						index = cmd.find(argumentPlaceholder, index);
-						if (index == std::string::npos) break;
-						// Make the replacement
-						cmd.replace(index, argumentPlaceholder.length(), title);
-						// Advance index forward
-						index += title.length();
-					}
-					// run the cmd
-					system(cmd.c_str());
-				}
+				runDeleteCommand(currentIndex);
 			}
 			else {
 				// normal case: exit and return index of current item 
@@ -658,6 +667,7 @@ namespace
 			break;
 		// button Y (Left Alt key)
 		case SDLK_LALT:
+			if (!isAllowDeletion) return; // disable if option -d is not set
 			if (isDeleteMode) return; // disable in delete mode
 			isDeleteMode = true;
 			isShowDescription = true; // ensure instruction & title is shown
