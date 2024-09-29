@@ -21,11 +21,12 @@ using namespace std;
 // settings
 int scrollingFrames = 20; // how many frames used for image scrolling
 int fontSize = 28;
-SDL_Color text_color = {255, 255, 255, 255};
+SDL_Color text_color = {220, 220, 220, 255};
 bool isMultipleLineTitle = false;
 bool isShowDescription = true;
 bool isSwapLeftRight = false;
 int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
+string instructionText = "\u2190/\u2192:Scroll A:Confirm B:Cancel: Y:Remove";
 
 // global variables used in main.cpp
 string programName;
@@ -33,10 +34,12 @@ list<ImageItem *> imageItems;				  // all loaded images
 std::list<ImageItem *>::iterator currentIter; // iterator point to current image item
 TTF_Font *font = nullptr;
 SDL_Texture *messageBGTexture = nullptr;
-SDL_Texture *messageTexture = nullptr;
+SDL_Texture *titleTexture = nullptr;
+SDL_Texture *instructionTexture = nullptr;
 SDL_Rect overlay_bg_render_rect = {0, 0, 0, 0};
-SDL_Rect overlay_text_render_rect = {0, 0, 0, 0};
-bool isScrollingMessage = false;
+SDL_Rect overlay_title_render_rect = {0, 0, 0, 0};
+SDL_Rect overlay_instruction_render_rect = {0, 0, 0, 0};
+bool isScrollingTitle = false;
 int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
 int scrollingTargetY = 0; // starting value of texture target y coordinate
@@ -279,6 +282,49 @@ namespace
 		return 0;
 	}
 
+	void prepareTextures()
+	{
+		// create message overlay background texture
+		int overlay_height = fontSize + fontSize / 2;
+		SDL_Rect overlay_bg_rect = {0, 0, overlay_height, global::SCREEN_HEIGHT};
+		overlay_bg_render_rect.x = global::SCREEN_WIDTH - overlay_height;
+		overlay_bg_render_rect.y = 0;
+		overlay_bg_render_rect.w = overlay_height;
+		overlay_bg_render_rect.h = global::SCREEN_HEIGHT;
+		SDL_Surface *surfacebg = SDL_CreateRGBSurface(
+			0,
+			overlay_height,
+			global::SCREEN_HEIGHT,
+			32, 0, 0, 0, 0);
+		SDL_FillRect(
+			surfacebg,
+			&overlay_bg_rect,
+			SDL_MapRGB(surfacebg->format, 0, 0, 0));
+		SDL_SetSurfaceBlendMode(surfacebg, SDL_BLENDMODE_BLEND);
+		messageBGTexture = SDL_CreateTextureFromSurface(
+			global::renderer,
+			surfacebg);
+		SDL_SetTextureAlphaMod(messageBGTexture, 128);
+		SDL_FreeSurface(surfacebg);
+
+		// create texture for instruction text
+		SDL_Surface *surfaceInstruction = TTF_RenderUTF8_Blended(
+			font,
+			instructionText.c_str(),
+			text_color
+		);
+		instructionTexture = SDL_CreateTextureFromSurface(
+			global::renderer,
+			surfaceInstruction);
+		overlay_instruction_render_rect.x = 
+			-(surfaceInstruction->w - surfaceInstruction->h) / 2;
+		overlay_instruction_render_rect.y =
+			(global::SCREEN_HEIGHT - surfaceInstruction->h) / 2;
+		overlay_instruction_render_rect.w = surfaceInstruction->w;
+		overlay_instruction_render_rect.h = surfaceInstruction->h;
+		SDL_FreeSurface(surfaceInstruction);
+	}
+
 	void updateMessageTexture(string message)
 	{
 		// create new message text texture
@@ -300,29 +346,29 @@ namespace
 				text_color
 			);
 		}
-		messageTexture = SDL_CreateTextureFromSurface(
+		titleTexture = SDL_CreateTextureFromSurface(
 			global::renderer,
 			surfaceMessage);
 
-		overlay_text_render_rect.x =
+		overlay_title_render_rect.x =
 			(global::SCREEN_WIDTH - surfaceMessage->w) +
 			(surfaceMessage->w - surfaceMessage->h) / 2;
-		overlay_text_render_rect.y =
+		overlay_title_render_rect.y =
 			(global::SCREEN_HEIGHT - surfaceMessage->h) / 2;
-		overlay_text_render_rect.w = surfaceMessage->w;
-		overlay_text_render_rect.h = surfaceMessage->h;
+		overlay_title_render_rect.w = surfaceMessage->w;
+		overlay_title_render_rect.h = surfaceMessage->h;
 
 		// initial variables for scrolling title
-		isScrollingMessage = false;
+		isScrollingTitle = false;
 		if (!isMultipleLineTitle && surfaceMessage->w > global::SCREEN_HEIGHT)
 		{
-			isScrollingMessage = true;
+			isScrollingTitle = true;
 			scrollingPause = 10;
 			scrollingOffset = 0;
 			scrollingLength = surfaceMessage->w + 40;
 			scrollingLength -= scrollingLength % 4;
-			overlay_text_render_rect.y += (global::SCREEN_HEIGHT - surfaceMessage->w) / 2;
-			scrollingTargetY = overlay_text_render_rect.y;
+			overlay_title_render_rect.y += (global::SCREEN_HEIGHT - surfaceMessage->w) / 2;
+			scrollingTargetY = overlay_title_render_rect.y;
 		}
 
 		if (isMultipleLineTitle)
@@ -336,20 +382,30 @@ namespace
 		SDL_FreeSurface(surfaceMessage);
 	}
 
-	void renderDescription(Uint8 alpha)
+	void renderInstruction()
 	{
-		if (!isShowDescription)
-			return;
+		if (!isShowDescription) return;
+
+		auto rect = overlay_bg_render_rect;
+		rect.x = 0;
+		SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &rect);
+		SDL_RenderCopyEx(global::renderer, instructionTexture, nullptr, &overlay_instruction_render_rect, 270, nullptr, SDL_FLIP_NONE);
+	}
+
+	void renderTitle(Uint8 alpha)
+	{
+		if (!isShowDescription)return;
+
 		SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &overlay_bg_render_rect);
-		SDL_SetTextureAlphaMod(messageTexture, alpha);
-		SDL_RenderCopyEx(global::renderer, messageTexture, nullptr, &overlay_text_render_rect, 270, nullptr, SDL_FLIP_NONE);
+		SDL_SetTextureAlphaMod(titleTexture, alpha);
+		SDL_RenderCopyEx(global::renderer, titleTexture, nullptr, &overlay_title_render_rect, 270, nullptr, SDL_FLIP_NONE);
 
 		// render the second message if using rolling message
-		if (isScrollingMessage && scrollingLength - scrollingOffset < global::SCREEN_HEIGHT)
+		if (isScrollingTitle && scrollingLength - scrollingOffset < global::SCREEN_HEIGHT)
 		{
-			auto rect = overlay_text_render_rect; // struct copy here
+			auto rect = overlay_title_render_rect; // struct copy here
 			rect.y -= scrollingLength;			  // shift right with scrolling text length
-			SDL_RenderCopyEx(global::renderer, messageTexture, nullptr, &rect, 270, nullptr, SDL_FLIP_NONE);
+			SDL_RenderCopyEx(global::renderer, titleTexture, nullptr, &rect, 270, nullptr, SDL_FLIP_NONE);
 		}
 	}
 
@@ -364,14 +420,14 @@ namespace
 
 		// update offset and texture target y coordinate
 		scrollingOffset += scrollingSpeed;
-		overlay_text_render_rect.y += scrollingSpeed;
+		overlay_title_render_rect.y += scrollingSpeed;
 
 		// reset if the text is completely scrolled outside of screen
 		if (scrollingOffset >= scrollingLength)
 		{
 			scrollingPause = 10;
 			scrollingOffset = 0;
-			overlay_text_render_rect.y = scrollingTargetY;
+			overlay_title_render_rect.y = scrollingTargetY;
 		}
 	}
 
@@ -396,13 +452,15 @@ namespace
 			curr->renderOffset(0, easing);
 			prev->renderOffset(0, easing - 1);
 			int text_alpha = static_cast<int>((i * 255.0) / scrollingFrames);
-			renderDescription(text_alpha);
+			renderTitle(text_alpha);
+			renderInstruction();
 			offset += step;
 			SDL_RenderPresent(global::renderer);
 			SDL_Delay(30);
 		}
 		prev->renderOffset(0, 0);
-		renderDescription(255);
+		renderTitle(255);
+		renderInstruction();
 		SDL_RenderPresent(global::renderer);
 
 		// update iterator
@@ -432,13 +490,15 @@ namespace
 			curr->renderOffset(0, easing - 1);
 			next->renderOffset(0, easing);
 			int text_alpha = static_cast<int>((i * 255.0) / scrollingFrames);
-			renderDescription(text_alpha);
+			renderTitle(text_alpha);
+			renderInstruction();
 			offset -= step;
 			SDL_RenderPresent(global::renderer);
 			SDL_Delay(30);
 		}
 		next->renderOffset(0, 0);
-		renderDescription(255);
+		renderTitle(255);
+		renderInstruction();
 		SDL_RenderPresent(global::renderer);
 
 		// update iterator
@@ -512,28 +572,7 @@ int main(int argc, char *argv[])
 	if (global::renderer == nullptr)
 		printErrorAndExit("Renderer creation failed");
 
-	// create message overlay background texture
-	int overlay_height = fontSize + fontSize / 2;
-	SDL_Rect overlay_bg_rect = {0, 0, overlay_height, global::SCREEN_HEIGHT};
-	overlay_bg_render_rect.x = global::SCREEN_WIDTH - overlay_height;
-	overlay_bg_render_rect.y = 0;
-	overlay_bg_render_rect.w = overlay_height;
-	overlay_bg_render_rect.h = global::SCREEN_HEIGHT;
-	SDL_Surface *surfacebg = SDL_CreateRGBSurface(
-		0,
-		overlay_height,
-		global::SCREEN_HEIGHT,
-		32, 0, 0, 0, 0);
-	SDL_FillRect(
-		surfacebg,
-		&overlay_bg_rect,
-		SDL_MapRGB(surfacebg->format, 0, 0, 0));
-	SDL_SetSurfaceBlendMode(surfacebg, SDL_BLENDMODE_BLEND);
-	messageBGTexture = SDL_CreateTextureFromSurface(
-		global::renderer,
-		surfacebg);
-	SDL_SetTextureAlphaMod(messageBGTexture, 128);
-	SDL_FreeSurface(surfacebg);
+	prepareTextures();
 
 	// load all image filenames and create imageItem instances
 	loadImageFiles(argv[1]);
@@ -576,8 +615,9 @@ int main(int argc, char *argv[])
 
 		// render current image and title
 		(*currentIter)->renderOffset(0, 0);
-		if (isScrollingMessage) scrollingDescription();
-		renderDescription(255);
+		if (isScrollingTitle) scrollingDescription();
+		renderTitle(255);
+		renderInstruction();
 		SDL_RenderPresent(global::renderer);
 
 		// delay for around 30 fps
