@@ -6,6 +6,7 @@
 #include <list>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <algorithm>
 
 #include <SDL.h>
@@ -14,36 +15,44 @@
 
 #include "global.h"
 #include "image_item.h"
+#include "text_texture.h"
 #include "fileutils.h"
 
 using namespace std;
 
 // settings
 int scrollingFrames = 20; // how many frames used for image scrolling
-int fontSize = 28;
-SDL_Color text_color = {220, 220, 220, 255};
-bool isMultipleLineTitle = false;
+bool isMultilineTitle = false;
 bool isShowDescription = true;
 bool isSwapLeftRight = false;
+bool isAllowDeletion = false;
+bool isShowItemIndex = true;
+string deleteCommand = "";
 int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
-string instructionText = "\u2190/\u2192:Scroll A:Confirm B:Cancel: Y:Remove";
 
 // global variables used in main.cpp
 string programName;
 list<ImageItem *> imageItems;				  // all loaded images
 std::list<ImageItem *>::iterator currentIter; // iterator point to current image item
+int fontSize = 28;
+SDL_Color text_color = {220, 220, 220, 255};
+SDL_Color delete_mode_text_color = {255, 50, 50, 255};
 TTF_Font *font = nullptr;
 SDL_Texture *messageBGTexture = nullptr;
-SDL_Texture *titleTexture = nullptr;
-SDL_Texture *instructionTexture = nullptr;
+TextTexture *titleTexture = nullptr;
+TextTexture *instructionTexture = nullptr;
+TextTexture *deleteInstructionTexture = nullptr;
+TextTexture *indexTexture = nullptr;
 SDL_Rect overlay_bg_render_rect = {0, 0, 0, 0};
-SDL_Rect overlay_title_render_rect = {0, 0, 0, 0};
-SDL_Rect overlay_instruction_render_rect = {0, 0, 0, 0};
 bool isScrollingTitle = false;
+bool isDeleteMode = false;
 int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
-int scrollingTargetY = 0; // starting value of texture target y coordinate
 int scrollingPause = 10;  // number of frames to pause when text touch left screen boundary
+string instructionText = "\u2190/\u2192:Scroll [A]:Confirm [B]:Cancel [Y]:Remove";
+string shortInstructionText = "[A]:Confirm [B]:Cancel [Y]:Remove";
+string deleteInstructionText = "Remove Item?  [A]:Confirm [B]:Cancel";
+string argumentPlaceholder = "TITLE";
 
 namespace
 {
@@ -69,13 +78,17 @@ namespace
 	void printUsage()
 	{
 		cout << endl
-			 << "Usage: switcher image_list title_list [-s speed] [-b on|off] [-m on|off] [-t on|off] [-ts speed]" << endl
+			 << "Usage: switcher image_list title_list [-s speed] [-b on|off] [-m on|off] [-t on|off] [-ts speed] [-n on|off] [-d command]" << endl
 			 << endl
 			 << "-s:\timage scrolling speed in frames (default is 20), larger value means slower." << endl
 			 << "-b:\tswap left/right buttons for image scrolling (default is off)." << endl
 			 << "-m:\tdisplay title in multiple lines (default is off)." << endl
 			 << "-t:\tdisplay title at start (default is on)." << endl
 			 << "-ts:\ttitle scrolling speed in pixel per frame (default is 4)." << endl
+			 << "-n:\tdisplay item index (default is on)." << endl
+			 << "-d:\tenable item deletion with the deletion command provided (default is disable)." << endl
+			 << "\tUse TITLE in command to take the selected title as input. e.g. \"echo TITLE\"" << endl
+			 << "\tPass \"\" as argument if no command is provided." << endl
 			 << "-h,--help\tshow this help message." << endl
 			 << endl
 			 << "Control: Left/Right: Switch games, A: Confirm, B: Cancel, R1: Toggle title" << endl
@@ -144,9 +157,9 @@ namespace
 				if (i == argc - 1)
 					printErrorUsageAndExit("-m: Missing option value");
 				if (strcmp(argv[i + 1], "on") == 0)
-					isMultipleLineTitle = true;
+					isMultilineTitle = true;
 				else if (strcmp(argv[i + 1], "off") == 0)
-					isMultipleLineTitle = false;
+					isMultilineTitle = false;
 				else
 					printErrorUsageAndExit("-m: Invalue option value, expects on/off\n");
 				i += 2;
@@ -171,6 +184,29 @@ namespace
 				if (s <= 0)
 					printErrorUsageAndExit("-ts: Invalue scrolling speed");
 				scrollingSpeed = s;
+				i += 2;
+			}
+			else if (strcmp(option, "-n") == 0)
+			{
+				if (i == argc - 1)
+					printErrorUsageAndExit("-n: Missing option value");
+				if (strcmp(argv[i + 1], "on") == 0)
+					isShowItemIndex = true;
+				else if (strcmp(argv[i + 1], "off") == 0)
+					isShowItemIndex = false;
+				else
+					printErrorUsageAndExit("-m: Invalue option value, expects on/off\n");
+				i += 2;
+			}
+			else if (strcmp(option, "-d") == 0)
+			{
+				if (i == argc - 1)
+					printErrorUsageAndExit("-d: Missing option value");
+				string cmd = argv[i + 1];
+				ltrim(cmd);
+				rtrim(cmd);
+				deleteCommand = cmd;
+				isAllowDeletion = true;
 				i += 2;
 			}
 			else if (strcmp(option, "-h") == 0 || strcmp(option, "--help") == 0)
@@ -308,78 +344,91 @@ namespace
 		SDL_FreeSurface(surfacebg);
 
 		// create texture for instruction text
-		SDL_Surface *surfaceInstruction = TTF_RenderUTF8_Blended(
+		instructionTexture = new TextTexture(
+			isShowItemIndex ? shortInstructionText : instructionText,
 			font,
-			instructionText.c_str(),
-			text_color
+			text_color,
+			isShowItemIndex ? TextTextureAlignment::topLeft : TextTextureAlignment::topCenter
 		);
-		instructionTexture = SDL_CreateTextureFromSurface(
-			global::renderer,
-			surfaceInstruction);
-		overlay_instruction_render_rect.x = 
-			-(surfaceInstruction->w - surfaceInstruction->h) / 2;
-		overlay_instruction_render_rect.y =
-			(global::SCREEN_HEIGHT - surfaceInstruction->h) / 2;
-		overlay_instruction_render_rect.w = surfaceInstruction->w;
-		overlay_instruction_render_rect.h = surfaceInstruction->h;
-		SDL_FreeSurface(surfaceInstruction);
+
+		// create texture for delete instruction text
+		deleteInstructionTexture = new TextTexture(
+			deleteInstructionText,
+			font,
+			delete_mode_text_color,
+			TextTextureAlignment::topCenter
+		);
 	}
 
 	void updateMessageTexture(string message)
 	{
 		// create new message text texture
-		SDL_Surface *surfaceMessage = nullptr;
-		if (isMultipleLineTitle) 
+		if (isMultilineTitle)
 		{
-			surfaceMessage = TTF_RenderUTF8_Blended_Wrapped(
-				font,
+			titleTexture = new TextTexture(
 				message.c_str(),
+				font,
 				text_color,
+				TextTextureAlignment::bottomLeft,
 				global::SCREEN_HEIGHT - 20
 			);
 		}
 		else
 		{
-			surfaceMessage = TTF_RenderUTF8_Blended(
-				font,
+			titleTexture = new TextTexture(
 				message.c_str(),
-				text_color
+				font,
+				text_color,
+				TextTextureAlignment::bottomCenter
 			);
 		}
-		titleTexture = SDL_CreateTextureFromSurface(
-			global::renderer,
-			surfaceMessage);
-
-		overlay_title_render_rect.x =
-			(global::SCREEN_WIDTH - surfaceMessage->w) +
-			(surfaceMessage->w - surfaceMessage->h) / 2;
-		overlay_title_render_rect.y =
-			(global::SCREEN_HEIGHT - surfaceMessage->h) / 2;
-		overlay_title_render_rect.w = surfaceMessage->w;
-		overlay_title_render_rect.h = surfaceMessage->h;
 
 		// initial variables for scrolling title
 		isScrollingTitle = false;
-		if (!isMultipleLineTitle && surfaceMessage->w > global::SCREEN_HEIGHT)
+		if (!isMultilineTitle && titleTexture->getWidth() > global::SCREEN_HEIGHT)
 		{
 			isScrollingTitle = true;
 			scrollingPause = 10;
 			scrollingOffset = 0;
-			scrollingLength = surfaceMessage->w + 40;
-			scrollingLength -= scrollingLength % 4;
-			overlay_title_render_rect.y += (global::SCREEN_HEIGHT - surfaceMessage->w) / 2;
-			scrollingTargetY = overlay_title_render_rect.y;
+			scrollingLength = titleTexture->getWidth() + 40;
+			scrollingLength -= scrollingLength % scrollingSpeed;
+			titleTexture->updateTargetRect(TextTextureAlignment::bottomLeft);
 		}
 
-		if (isMultipleLineTitle)
+		// initial variables for multiline title
+		if (isMultilineTitle)
 		{
-			overlay_bg_render_rect.x = global::SCREEN_WIDTH - surfaceMessage->h;
+			overlay_bg_render_rect.x = global::SCREEN_WIDTH - titleTexture->getHeight();
 			overlay_bg_render_rect.y = 0;
-			overlay_bg_render_rect.w = surfaceMessage->h;
+			overlay_bg_render_rect.w = titleTexture->getHeight();
 			overlay_bg_render_rect.h = global::SCREEN_HEIGHT;
 		}
+	}
 
-		SDL_FreeSurface(surfaceMessage);
+	void updateIndexTexture() {
+		// find the index of current item in list
+		// note that this may not be the same as currentItem->getIndex()
+		auto index = imageItems.size();
+		auto iter = imageItems.begin();
+		while (iter != imageItems.end())
+		{
+			if (iter == currentIter) break;
+			index--;
+			iter++;
+		}
+
+		// create texture
+		std::stringstream ss;
+		ss << '[' << index << '/' << imageItems.size() << ']'; 
+		indexTexture = new TextTexture(
+			ss.str(),
+			font,
+			text_color,
+			TextTextureAlignment::topRight
+		);
+
+		// shift left 5 pixels
+		indexTexture->scrollLeft(5);
 	}
 
 	void renderInstruction()
@@ -388,8 +437,28 @@ namespace
 
 		auto rect = overlay_bg_render_rect;
 		rect.x = 0;
-		SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &rect);
-		SDL_RenderCopyEx(global::renderer, instructionTexture, nullptr, &overlay_instruction_render_rect, 270, nullptr, SDL_FLIP_NONE);
+		rect.w = fontSize + fontSize / 2;
+
+		if (isDeleteMode) 
+		{
+			// deelete mode - render dimmer background and delete instruction at top of screen
+
+			// render a less transparent background
+			Uint8 old_alpha;
+			SDL_GetTextureAlphaMod(messageBGTexture, &old_alpha);
+			SDL_SetTextureAlphaMod(messageBGTexture, 200);
+			SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &rect);
+			SDL_SetTextureAlphaMod(messageBGTexture, old_alpha);
+			// render delete instruction text
+			deleteInstructionTexture->render();
+		}
+		else
+		{
+			// normal case - render background and instruction at top of screen
+			SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &rect);
+			instructionTexture->render();
+			if (isShowItemIndex) indexTexture->render();
+		}
 	}
 
 	void renderTitle(Uint8 alpha)
@@ -397,15 +466,13 @@ namespace
 		if (!isShowDescription)return;
 
 		SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &overlay_bg_render_rect);
-		SDL_SetTextureAlphaMod(titleTexture, alpha);
-		SDL_RenderCopyEx(global::renderer, titleTexture, nullptr, &overlay_title_render_rect, 270, nullptr, SDL_FLIP_NONE);
+		SDL_SetTextureAlphaMod(titleTexture->getTexture(), alpha);
+		titleTexture->render();
 
 		// render the second message if using rolling message
 		if (isScrollingTitle && scrollingLength - scrollingOffset < global::SCREEN_HEIGHT)
 		{
-			auto rect = overlay_title_render_rect; // struct copy here
-			rect.y -= scrollingLength;			  // shift right with scrolling text length
-			SDL_RenderCopyEx(global::renderer, titleTexture, nullptr, &rect, 270, nullptr, SDL_FLIP_NONE);
+			titleTexture->render(scrollingLength);
 		}
 	}
 
@@ -420,18 +487,18 @@ namespace
 
 		// update offset and texture target y coordinate
 		scrollingOffset += scrollingSpeed;
-		overlay_title_render_rect.y += scrollingSpeed;
+		titleTexture->scrollLeft(scrollingSpeed);
 
 		// reset if the text is completely scrolled outside of screen
 		if (scrollingOffset >= scrollingLength)
 		{
 			scrollingPause = 10;
 			scrollingOffset = 0;
-			overlay_title_render_rect.y = scrollingTargetY;
+			titleTexture->updateTargetRect(TextTextureAlignment::bottomLeft);
 		}
 	}
 
-	void scrollRight()
+	void scrollRight(bool showCurrent = true)
 	{
 		// get current and previous images
 		auto prevIter = currentIter;
@@ -449,7 +516,7 @@ namespace
 		{
 			double easing = easeInOutQuart(offset);
 			SDL_RenderClear(global::renderer);
-			curr->renderOffset(0, easing);
+			if (showCurrent) curr->renderOffset(0, easing);
 			prev->renderOffset(0, easing - 1);
 			int text_alpha = static_cast<int>((i * 255.0) / scrollingFrames);
 			renderTitle(text_alpha);
@@ -465,9 +532,10 @@ namespace
 
 		// update iterator
 		currentIter = prevIter;
+		if (isShowItemIndex) updateIndexTexture();
 	}
 
-	void scrollLeft()
+	void scrollLeft(bool showCurrent = true)
 	{
 		// get current and next images
 		auto nextIter = currentIter;
@@ -487,7 +555,7 @@ namespace
 		{
 			double easing = easeInOutQuart(offset);
 			SDL_RenderClear(global::renderer);
-			curr->renderOffset(0, easing - 1);
+			if (showCurrent) curr->renderOffset(0, easing - 1);
 			next->renderOffset(0, easing);
 			int text_alpha = static_cast<int>((i * 255.0) / scrollingFrames);
 			renderTitle(text_alpha);
@@ -503,6 +571,38 @@ namespace
 
 		// update iterator
 		currentIter = nextIter;
+		if (isShowItemIndex) updateIndexTexture();
+	}
+
+	void removeCurrentItem()
+	{
+		// fade out current item
+		Uint8 old_alpha;
+		auto texture = (*currentIter)->getTexture();
+		SDL_GetTextureAlphaMod(texture, &old_alpha);
+		for (int alpha = 255; alpha >= 0; alpha-=20)
+		{
+			SDL_SetTextureAlphaMod(texture, alpha);
+			(*currentIter)->renderOffset(0, 0);
+			SDL_RenderPresent(global::renderer);
+			SDL_Delay(30);
+		}
+		SDL_SetTextureAlphaMod(texture, old_alpha);
+
+		// get next iterator
+		auto iter = currentIter;
+
+		// if no more item in list after removing current item, exit with value 0
+		if (imageItems.size() == 1) exit(0);
+
+		// scroll the next item without showing the current item
+		scrollRight(false);
+
+		// remove current item from list
+		imageItems.remove(*iter);
+
+		// update index for display
+		if (isShowItemIndex) updateIndexTexture();
 	}
 
 	void keyPress(const SDL_Event &event)
@@ -514,16 +614,55 @@ namespace
 		{
 		// button A (Space key)
 		case SDLK_SPACE:
-			exit((*currentIter)->getIndex());
+			if (isDeleteMode) {
+				// delete mode: remove current item when A is pressed
+				isDeleteMode = false; // reset flag to end delete mode
+				string title = (*currentIter)->getDescription(); // get title of current item first
+				removeCurrentItem();
+	
+				// if command is provided
+				if (!deleteCommand.empty())
+				{
+					// get the provided command
+					string cmd = deleteCommand;
+					// replace placeholder with current title
+					unsigned int index = 0;
+					while (true)
+					{
+						// Locate the substring to replace
+						index = cmd.find(argumentPlaceholder, index);
+						if (index == std::string::npos) break;
+						// Make the replacement
+						cmd.replace(index, argumentPlaceholder.length(), title);
+						// Advance index forward
+						index += title.length();
+					}
+					// run the cmd
+					system(cmd.c_str());
+				}
+			}
+			else {
+				// normal case: exit and return index of current item 
+				exit((*currentIter)->getIndex());
+			}
 			break;
 		// button LEFT (Left arrow key)
 		case SDLK_LEFT:
+			if (isDeleteMode) return; // disable in delete mode
 			if (isSwapLeftRight) scrollRight(); else scrollLeft();
 			break;
 		// button RIGHT (Right arrow key)
 		case SDLK_RIGHT:
+			if (isDeleteMode) return; // disable in delete mode
 			if (isSwapLeftRight) scrollLeft(); else scrollRight();
 			break;
+		// button Y (Left Alt key)
+		case SDLK_LALT:
+			if (isDeleteMode) return; // disable in delete mode
+			isDeleteMode = true;
+			isShowDescription = true; // ensure instruction & title is shown
+			break;
+		// button R1 (Backspace key)
 		case SDLK_BACKSPACE:
 			isShowDescription = !isShowDescription;
 			break;
@@ -532,7 +671,13 @@ namespace
 		// button B (Left control key)
 		if (event.key.keysym.mod == KMOD_LCTRL)
 		{
-			exit(0);
+			if (isDeleteMode) {
+				// delete mode: cancel delete mode when B is pressed
+				isDeleteMode = false;
+			} else {
+				// normal case: exit with return value 0
+				exit(0);
+			}
 		}
 	}
 
@@ -592,8 +737,9 @@ int main(int argc, char *argv[])
 	// set current image as last image in list
 	currentIter = --imageItems.end();
 
-	// create message text texture
+	// create title text texture and index texture
 	updateMessageTexture((*currentIter)->getDescription());
+	if (isShowItemIndex) updateIndexTexture();
 
 	// Execute main loop of the window
 	while (true)

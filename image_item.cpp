@@ -123,23 +123,3 @@ SDLSurfaceUniquePtr ImageItem::loadImageToFit(
 
     return l_img2;
 }
-
-int ImageItem::getIndex() const
-{
-    return index_;
-}
-
-std::string ImageItem::getFilename() const
-{
-    return filename_;
-}
-
-void ImageItem::setDescription(std::string description)
-{
-    description_ = description;
-}
-
-std::string ImageItem::getDescription() const
-{
-    return description_;
-}

@@ -30,11 +30,11 @@ public:
     void renderOffset(double offset_x, double offset_y);
 
     bool loading_ok_;
-    int getIndex() const;
-    std::string getFilename() const;
-    void setDescription(std::string);
-    std::string getDescription() const;
-
+    int getIndex() const { return index_; }
+    std::string getFilename() const { return filename_; }
+    void setDescription(std::string description) { description_ = description; }
+    std::string getDescription() const { return description_; }
+    SDL_Texture * getTexture() const { return texture_.get(); }
 private:
     void init();
 
