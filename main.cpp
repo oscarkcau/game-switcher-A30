@@ -18,7 +18,11 @@
 #include "text_texture.h"
 #include "fileutils.h"
 
-using namespace std;
+using std::string;
+using std::cout;
+using std::cerr;
+using std::endl;
+using std::list;
 
 // settings
 int scrollingFrames = 20; // how many frames used for image scrolling
@@ -33,7 +37,7 @@ int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
 // global variables used in main.cpp
 string programName;
 list<ImageItem *> imageItems;				  // all loaded images
-std::list<ImageItem *>::iterator currentIter; // iterator point to current image item
+list<ImageItem *>::iterator currentIter; // iterator point to current image item
 int fontSize = 28;
 SDL_Color text_color = {220, 220, 220, 255};
 SDL_Color delete_mode_text_color = {255, 50, 50, 255};
@@ -50,10 +54,10 @@ bool isDeleteMode = false;
 int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
 int scrollingPause = 10;  // number of frames to pause when text touch left screen boundary
-string instructionText = "\u2190/\u2192:Scroll [A]:Confirm [B]:Cancel";
-string shortInstructionText = "[A]:Load [B]:Exit";
-string deleteAddonText = " [Y]:Remove";
-string deleteInstructionText = "Remove Item?  [A]:Confirm [B]:Cancel";
+string instructionText = " \u2190/\u2192 Scroll   \u24B6 Load   \u24B7 Exit";
+string shortInstructionText = " \u24B6 Load   \u24B7 Exit";
+string deleteAddonText = "   \u24CE Remove";
+string deleteInstructionText = "Remove Item?   \u24B6 Confirm   \u24B7 Cancel";
 string argumentPlaceholder = "INDEX";
 
 namespace
@@ -342,7 +346,7 @@ namespace
 		messageBGTexture = SDL_CreateTextureFromSurface(
 			global::renderer,
 			surfacebg);
-		SDL_SetTextureAlphaMod(messageBGTexture, 128);
+		SDL_SetTextureAlphaMod(messageBGTexture, 160);
 		SDL_FreeSurface(surfacebg);
 
 		// create texture for instruction text

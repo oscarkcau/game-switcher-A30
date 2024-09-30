@@ -9,12 +9,12 @@ WARMINGS += -Wold-style-cast -Wmissing-declarations
 
 export PATH=/opt/a30/bin:$(shell echo $$PATH)
 
-all: switcher
+all: $(TARGET)
 
-SDL_rotozoom.o:
+SDL_rotozoom.o: SDL_rotozoom.c
 	$(CROSS)g++ -c SDL_rotozoom.c $(CXXFLAGS) $(LDFLAGS)
 
-switcher: SDL_rotozoom.o
+$(TARGET): SDL_rotozoom.o $(wildcard *.cpp) $(wildcard *.h)
 	$(CROSS)g++ *.cpp *.o -o $(TARGET) $(CXXFLAGS) $(LDFLAGS) $(WARMINGS)
 
 clean:
