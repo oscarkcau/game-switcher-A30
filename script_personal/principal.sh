@@ -10,9 +10,10 @@ runifnecessary(){
 rm /mnt/SDCARD/.tmp_update/flags/.save_active
 while [ 1 ]; do
 
-    # if [ -f /mnt/SDCARD/.tmp_update/flags/gs.lock ] ; then
+    if [ -f /mnt/SDCARD/.tmp_update/flags/gs.lock ] || \
+       [ -f /mnt/SDCARD/.tmp_update/flags/gs.fix ] ; then
         /mnt/SDCARD/.tmp_update/scripts/gameswitcher.sh
-    # fi
+    fi
 
     if [ ! -f /tmp/cmd_to_run.sh ] ; then
         # create in menu flag

@@ -29,7 +29,7 @@ int scrollingFrames = 20; // how many frames used for image scrolling
 bool isMultilineTitle = false;
 bool isShowDescription = true;
 bool isSwapLeftRight = false;
-bool isAllowDeletion = false;
+bool isAllowDeletion = true;
 bool isShowItemIndex = true;
 string deleteCommand = "";
 int scrollingSpeed = 4;	  // title scrolling speed in pixel per frame
@@ -208,11 +208,22 @@ namespace
 			{
 				if (i == argc - 1)
 					printErrorUsageAndExit("-d: Missing option value");
+				if (strcmp(argv[i + 1], "on") == 0)
+					isAllowDeletion = true;
+				else if (strcmp(argv[i + 1], "off") == 0)
+					isAllowDeletion = false;
+				else
+					printErrorUsageAndExit("-m: Invalue option value, expects on/off\n");
+				i += 2;
+			}			
+			else if (strcmp(option, "-dc") == 0)
+			{
+				if (i == argc - 1)
+					printErrorUsageAndExit("-dc: Missing option value");
 				string cmd = argv[i + 1];
 				ltrim(cmd);
 				rtrim(cmd);
 				deleteCommand = cmd;
-				isAllowDeletion = true;
 				i += 2;
 			}
 			else if (strcmp(option, "-h") == 0 || strcmp(option, "--help") == 0)
