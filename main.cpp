@@ -39,10 +39,11 @@ string programName;
 list<ImageItem *> imageItems;				  // all loaded images
 list<ImageItem *>::iterator currentIter; // iterator point to current image item
 int fontSize = 28;
-SDL_Color text_color = {220, 220, 220, 255};
+SDL_Color text_color = {235, 219, 178, 255};
 SDL_Color delete_mode_text_color = {255, 50, 50, 255};
 TTF_Font *fontInstruction = nullptr;
 TTF_Font *fontTitle = nullptr;
+string fontPath = "res/nunwen.ttf";
 SDL_Texture *messageBGTexture = nullptr;
 TextTexture *titleTexture = nullptr;
 TextTexture *instructionTexture = nullptr;
@@ -731,8 +732,8 @@ int main(int argc, char *argv[])
 	if (TTF_Init() == -1)
 		printErrorAndExit("TTF_Init failed: ", SDL_GetError());
 
-	fontInstruction = TTF_OpenFont("./nunwen.ttf", fontSize);
-	fontTitle = TTF_OpenFont("./nunwen.ttf", fontSize + 4);
+	fontInstruction = TTF_OpenFont(fontPath.c_str(), fontSize);
+	fontTitle = TTF_OpenFont(fontPath.c_str(), fontSize + 4);
 	if (fontInstruction == nullptr || fontTitle == nullptr)
 		printErrorAndExit("Font loading failed: ", TTF_GetError());
 
