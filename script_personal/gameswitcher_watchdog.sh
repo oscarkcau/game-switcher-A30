@@ -47,8 +47,12 @@ prepare_run_switcher() {
     mv "$TEMP_FILE" "$LIST_FILE"
 
     # kill RA or other emulator or MainUI
-    killall -q -15 retroarch || killall -q -15 ra32.miyoo || killall -q -9 MainUI || /mnt/SDCARD/miyoo/app/kill_apps.sh
-
+    killall -q -15 retroarch || \
+    killall -q -15 ra32.miyoo || \
+    killall -q -15 drastic || \
+    killall -q -9 MainUI || \
+    /mnt/SDCARD/miyoo/app/kill_apps.sh
+    
     # set flag file for principal.sh to load game switcher later
     touch "$FLAG_FILE"
 }
