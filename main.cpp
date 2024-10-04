@@ -55,9 +55,9 @@ bool isDeleteMode = false;
 int scrollingOffset = 0;  // current title scrolling offset
 int scrollingLength = 0;  // length of scrolling title with space
 int scrollingPause = 10;  // number of frames to pause when text touch left screen boundary
-string instructionText = " \u2190/\u2192 Scroll   \u24B6 Load   \u24B7 Exit";
-string shortInstructionText = " \u24B6 Load   \u24B7 Exit";
-string deleteAddonText = "   \u24CE Remove";
+string instructionText = " \u2190/\u2192 Scroll   \u24B6 Load   \u24B7 Exit   \u24CD Settings";
+string shortInstructionText = "\u24B6 Load  \u24B7 Exit  \u24CD Settings";
+string deleteAddonText = "  \u24CE Remove";
 string deleteInstructionText = "Remove Item?   \u24B6 Confirm   \u24B7 Cancel";
 string argumentPlaceholder = "INDEX";
 
@@ -362,7 +362,7 @@ namespace
 		SDL_FreeSurface(surfacebg);
 
 		// create texture for instruction text
-		string text = isShowItemIndex ? shortInstructionText : instructionText;
+		string text = shortInstructionText; //isShowItemIndex ? shortInstructionText : instructionText;
 		if (isAllowDeletion) text += deleteAddonText; 
 		instructionTexture = new TextTexture(
 			text,
@@ -681,6 +681,11 @@ namespace
 		case SDLK_RIGHT:
 			if (isDeleteMode) return; // disable in delete mode
 			if (isSwapLeftRight) scrollLeft(); else scrollRight();
+			break;
+		// button X (Left Shift key)
+		case SDLK_LSHIFT:
+			if (isDeleteMode) return; // disable in delete mode
+			exit(255);
 			break;
 		// button Y (Left Alt key)
 		case SDLK_LALT:

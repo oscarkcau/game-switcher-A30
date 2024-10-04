@@ -3,9 +3,10 @@
 INFO_DIR="/mnt/SDCARD/RetroArch/.retroarch/cores"
 DEFAULT_IMG="/mnt/SDCARD/Themes/SPRUCE/icons/ports.png"
 
-FLAG_FILE="/mnt/SDCARD/.tmp_update/flags/gs.lock"
-LIST_FILE="/mnt/SDCARD/.tmp_update/flags/gs_list"
-TEMP_FILE="/mnt/SDCARD/.tmp_update/flags/gs_list_temp"
+FLAG_PATH="/mnt/SDCARD/.tmp_update/flags"
+FLAG_FILE="$FLAG_PATH/gs.lock"
+LIST_FILE="$FLAG_PATH/gs_list"
+TEMP_FILE="$FLAG_PATH/gs_list_temp"
 LONG_PRESSED=false
 
 add_game_to_list() {
