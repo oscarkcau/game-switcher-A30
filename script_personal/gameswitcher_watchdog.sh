@@ -8,7 +8,7 @@ FLAG_PATH="/mnt/SDCARD/.tmp_update/flags"
 FLAG_FILE="$FLAG_PATH/gs.lock"
 LIST_FILE="$FLAG_PATH/gs_list"
 TEMP_FILE="$FLAG_PATH/gs_list_temp"
-LONG_PRESSED=false
+LONG_PRESS_FILE="$FLAG_PATH/gs.longpress"
 
 add_game_to_list() {
     # get game path
@@ -81,9 +81,9 @@ prepare_run_switcher() {
 
 long_press_handler() {
     # set flag for long pressed event
-    LONG_PRESSED=false
+    touch "$LONG_PRESS_FILE"
     sleep 2
-    LONG_PRESSED=true    
+    rm "$LONG_PRESS_FILE"
 
     add_game_to_list
     prepare_run_switcher
@@ -101,7 +101,7 @@ $BIN_PATH/getevent /dev/input/event3 | while read line; do
                     long_press_handler &
                     PID=$!
                 elif pgrep "PPSSPPSDL" > /dev/null ; then
-                    sleep 2 # wait 2 second for saving been started
+                    sleep 1 # wait 1 second for saving been started
                     add_game_to_list
                     prepare_run_switcher
                 else
@@ -120,7 +120,8 @@ $BIN_PATH/getevent /dev/input/event3 | while read line; do
             # kill the long press handler if 
             # menu button is released within time limit
             # and is in game now
-            if [ "$LONG_PRESSED" = false ] && [ -f /tmp/cmd_to_run.sh ] ; then
+            if [ -f "$LONG_PRESS_FILE" ] && [ -f /tmp/cmd_to_run.sh ] ; then
+                rm "$LONG_PRESS_FILE"
                 kill $PID
             fi
         ;;
