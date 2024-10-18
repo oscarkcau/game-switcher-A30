@@ -453,7 +453,6 @@ namespace
 
 	void renderInstruction()
 	{
-		if (!isShowDescription) return;
 		int overlay_height = fontSize + fontSize / 2;
 		auto rect = overlay_bg_render_rect;
 		rect.x = global::SCREEN_WIDTH - overlay_height;
@@ -472,12 +471,16 @@ namespace
 			// render delete instruction text
 			deleteInstructionTexture->render();
 		}
-		else
+		else if (isShowDescription)
 		{
 			// normal case - render background and instruction at top of screen
 			SDL_RenderCopy(global::renderer, messageBGTexture, nullptr, &rect);
 			instructionTexture->render();
 			if (isShowItemIndex) indexTexture->render();
+		}
+		else if (isShowItemIndex)
+		{
+			indexTexture->render();
 		}
 	}
 
