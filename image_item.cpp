@@ -10,8 +10,8 @@
 
 using namespace std;
 
-ImageItem::ImageItem(int index, std::string filename)
-    : index_(index), filename_(std::move(filename))
+ImageItem::ImageItem(int index, std::string filename, bool rotation)
+    : index_(index), filename_(std::move(filename)), rotation_(rotation)
 {
     init();
 }
@@ -28,11 +28,19 @@ void ImageItem::loadImage()
     if (loading_ok_)
         return;
 
-    image_ = SDLSurfaceUniquePtr{
-        loadImageToFit(
-            filename_,
-            global::SCREEN_HEIGHT,
-            global::SCREEN_WIDTH)};
+    if (rotation_) {
+        image_ = SDLSurfaceUniquePtr{
+            loadImageToFit(
+                filename_,
+                global::SCREEN_HEIGHT,
+                global::SCREEN_WIDTH)};
+    } else {
+        image_ = SDLSurfaceUniquePtr{
+            loadImageToFit(
+                filename_,
+                global::SCREEN_WIDTH,
+                global::SCREEN_HEIGHT)};
+    }
 
     if (image_ == nullptr)
         cerr << ("Image loading failed: ") << filename_ << endl;
@@ -68,15 +76,25 @@ void ImageItem::render(int x, int y)
 
     // Rectangle to hold the offsets
     SDL_Rect dstrect;
-    // Set offsets
-    dstrect.x = (global::SCREEN_WIDTH - image_->w) / 2 - 1 + x;
-    dstrect.y = (global::SCREEN_HEIGHT - image_->h) / 2 + y;
-    dstrect.w = image_->w;
-    dstrect.h = image_->h;
-    // Blit the surface
-    // SDL_RenderCopy(global::renderer, texture_.get(), NULL, &dstrect);
-    SDL_RenderCopyEx(global::renderer, texture_.get(), nullptr,
-                     &dstrect, 270, nullptr, SDL_FLIP_NONE);
+    if (rotation_) {
+        // Set offsets
+        dstrect.x = (global::SCREEN_WIDTH - image_->w) / 2 - 1 + x;
+        dstrect.y = (global::SCREEN_HEIGHT - image_->h) / 2 + y;
+        dstrect.w = image_->w;
+        dstrect.h = image_->h;
+        // Blit the surface
+        SDL_RenderCopyEx(global::renderer, texture_.get(), nullptr,
+                        &dstrect, 270, nullptr, SDL_FLIP_NONE);
+    } else {
+        // Set offsets
+        dstrect.x = (global::SCREEN_WIDTH - image_->w) / 2 - 1 + x;
+        dstrect.y = (global::SCREEN_HEIGHT - image_->h) / 2 + y;
+        dstrect.w = image_->w;
+        dstrect.h = image_->h;
+        // Blit the surface
+        SDL_RenderCopyEx(global::renderer, texture_.get(), nullptr,
+                        &dstrect, 0, nullptr, SDL_FLIP_NONE);
+    }
 }
 
 void ImageItem::renderOffset(double offset_x, double offset_y)

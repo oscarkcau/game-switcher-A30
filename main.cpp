@@ -247,6 +247,7 @@ namespace
 		{
 			string line;
 			int index = 1;
+			bool rotation = true;
 
 			// iterate all input line
 			while (std::getline(file, line))
@@ -258,9 +259,19 @@ namespace
 				// skip empty line
 				if (line.empty()) continue;
 
+				if (line == "__NO_ROTATE__") {
+					rotation = false;
+					continue;
+				}
+
 				// create imageItem and add to list
-				imageItems.push_back(new ImageItem(index, line));
+				imageItems.push_back(new ImageItem(index, line, rotation));
+				
+				// increace index
 				index++;
+
+				// reset rotation flag
+				rotation = true;
 			}
 		}
 		else

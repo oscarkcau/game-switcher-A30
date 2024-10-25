@@ -9,7 +9,10 @@ WARMINGS += -Wold-style-cast -Wmissing-declarations
 
 export PATH=/opt/a30/bin:$(shell echo $$PATH)
 
-all: $(TARGET)
+all: $(TARGET) fbfixcolor
+
+fbfixcolor: fbfixcolor.c
+	$(CROSS)g++  fbfixcolor.c -o fbfixcolor $(CXXFLAGS) $(LDFLAGS)
 
 SDL_rotozoom.o: SDL_rotozoom.c
 	$(CROSS)g++ -c SDL_rotozoom.c $(CXXFLAGS) $(LDFLAGS)

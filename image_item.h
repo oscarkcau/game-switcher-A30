@@ -8,7 +8,7 @@
 class ImageItem
 {
 public:
-    explicit ImageItem(int index, std::string filename);
+    explicit ImageItem(int index, std::string filename, bool rotation=true);
     virtual ~ImageItem() = default;
 
     // disallow copying and assignment
@@ -42,11 +42,12 @@ private:
     SDLSurfaceUniquePtr loadImageToFit(
         const std::string &p_filename, int fit_w, int fit_h);
 
-    int index_;
-    std::string filename_;
+    const int index_;
+    const std::string filename_;
     std::string description_;
     SDLSurfaceUniquePtr image_ = nullptr;
     SDLTextureUniquePtr texture_ = nullptr;
+    const bool rotation_;
 };
 
 #endif // IMAGE_ITEM_H_
