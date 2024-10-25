@@ -450,7 +450,7 @@ namespace
 
 		// create texture
 		std::stringstream ss;
-		ss << '[' << index << '/' << imageItems.size() << ']'; 
+		ss << index << '/' << imageItems.size(); 
 		indexTexture = new TextTexture(
 			ss.str(),
 			fontInstruction,
