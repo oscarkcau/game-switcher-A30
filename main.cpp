@@ -623,7 +623,7 @@ namespace
 		}
 		SDL_SetTextureAlphaMod(texture, old_alpha);
 
-		// get next iterator
+		// get current iterator
 		auto iter = currentIter;
 
 		// if no more item in list after removing current item, exit with value 0
@@ -678,8 +678,8 @@ namespace
 				// delete mode: remove current item when A is pressed
 				isDeleteMode = false; // reset flag to end delete mode
 				int currentIndex = (*currentIter)->getIndex(); // get title of current item first
-				removeCurrentItem();
 				runDeleteCommand(currentIndex);
+				removeCurrentItem();
 			}
 			else {
 				// normal case: exit and return index of current item 
